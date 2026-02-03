@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>PDF Viewer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: white;
+    }
+    
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+      /* Cacher la scrollbar */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE et Edge */
+    }
+    
+    /* Cacher la scrollbar pour Chrome, Safari et Opera */
+    #viewer-container::-webkit-scrollbar {
+      display: none;
+    }
+    
+    #viewer {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .page-container {
+      margin: 0;
+      background: white;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    canvas {
+      display: block;
+      width: 100vw;
+      height: auto;
+    }
+    
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #333;
+      font-size: 18px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px 40px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">Chargement du PDF...</div>
+  
+  <div id="viewer-container">
+    <div id="viewer"></div>
+  </div>
+
+  <script type="module">
+  import * as pdfjsLib from './pdfjs/pdf.mjs';
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
+
+  const url = 'src.pdf';
+  let pdfDoc = null;
+  let currentPage = 1;
+  let pageElements = [];
+
+  // Charger le PDF
+  const loadingDiv = document.getElementById('loading');
+  const viewerContainer = document.getElementById('viewer-container');
+
+  try {
+    pdfDoc = await pdfjsLib.getDocument(url).promise;
+
+    // Calculer le scale pour remplir la largeur de l'écran
+    const firstPage = await pdfDoc.getPage(1);
+    const viewport = firstPage.getViewport({ scale: 1 });
+    const scale = window.innerWidth / viewport.width;
+
+    // Rendre toutes les pages
+    for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+      const page = await pdfDoc.getPage(pageNumber);
+      const scaledViewport = page.getViewport({ scale: scale });
+
+      const pageContainer = document.createElement('div');
+      pageContainer.className = 'page-container';
+      pageContainer.dataset.pageNumber = pageNumber;
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+
+      canvas.width = scaledViewport.width;
+      canvas.height = scaledViewport.height;
+
+      await page.render({
+        canvasContext: context,
+        viewport: scaledViewport
+      }).promise;
+
+      pageContainer.appendChild(canvas);
+      document.getElementById('viewer').appendChild(pageContainer);
+      pageElements.push(pageContainer);
+    }
+
+    loadingDiv.style.display = 'none';
+
+  } catch (error) {
+    loadingDiv.textContent = 'Erreur lors du chargement du PDF : ' + error.message;
+    console.error('Erreur:', error);
+  }
+
+  // Fonction pour aller à une page spécifique
+  function goToPage(pageNum) {
+    if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
+    
+    currentPage = pageNum;
+    const pageElement = pageElements[pageNum - 1];
+    pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Navigation au clavier
+  document.addEventListener('keydown', (e) => {
+    switch(e.key) {
+      case 'ArrowDown':
+      case ' ':  // Espace
+      case 'PageDown':
+        e.preventDefault();
+        goToPage(currentPage + 1);
+        break;
+      case 'ArrowUp':
+      case 'PageUp':
+        e.preventDefault();
+        goToPage(currentPage - 1);
+        break;
+      case 'Home':
+        e.preventDefault();
+        goToPage(1);
+        break;
+      case 'End':
+        e.preventDefault();
+        if (pdfDoc) goToPage(pdfDoc.numPages);
+        break;
+    }
+  });
+
+  // Détecter quelle page est visible lors du scroll
+  let scrollTimeout;
+  viewerContainer.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      const containerRect = viewerContainer.getBoundingClientRect();
+      const containerCenter = containerRect.top + containerRect.height / 2;
+      
+      for (let i = 0; i < pageElements.length; i++) {
+        const pageRect = pageElements[i].getBoundingClientRect();
+        if (pageRect.top <= containerCenter && pageRect.bottom >= containerCenter) {
+          currentPage = i + 1;
+          break;
+        }
+      }
+    }, 100);
+  });
+</script>
+
+</body>
+</html>
