@@ -7,8 +7,7 @@
     @font-face {
     font-family: "self-modern_regular";
     src: url("/self-modern_regular.ttf");
-}
-
+  }
     html, body {
       margin: 0;
       padding: 0;
@@ -24,12 +23,10 @@
       overflow-y: scroll;
       overflow-x: hidden;
       scroll-behavior: smooth;
-      /* Cacher la scrollbar */
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE et Edge */
+      scrollbar-width: none;
+      -ms-overflow-style: none;
     }
     
-    /* Cacher la scrollbar pour Chrome, Safari et Opera */
     #viewer-container::-webkit-scrollbar {
       display: none;
     }
@@ -52,8 +49,10 @@
     
     canvas {
       display: block;
-      width: 100vw;
+      width: 100%;
       height: auto;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
     }
     
     #loading {
@@ -145,17 +144,22 @@
   let currentPage = 1;
   let pageElements = [];
   let renderedPages = new Set();
-  let scale = 1;
 
-  // Charger le PDF
   const loadingDiv = document.getElementById('loading');
   const viewerContainer = document.getElementById('viewer-container');
+
+  /* Device pixel ratio for high-resolution rendering */
+  const pixelRatio = window.devicePixelRatio || 1;
 
   async function renderPage(pageNumber) {
     if (renderedPages.has(pageNumber)) return;
     
     const page = await pdfDoc.getPage(pageNumber);
-    const scaledViewport = page.getViewport({ scale: scale });
+    
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = window.innerWidth / viewport.width;
+    
+    const scaledViewport = page.getViewport({ scale: scale * pixelRatio });
 
     const pageContainer = pageElements[pageNumber - 1];
     const canvas = document.createElement('canvas');
@@ -163,13 +167,15 @@
 
     canvas.width = scaledViewport.width;
     canvas.height = scaledViewport.height;
+    
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${scaledViewport.height / pixelRatio}px`;
 
     await page.render({
       canvasContext: context,
       viewport: scaledViewport
     }).promise;
 
-    // Remplacer le contenu du conteneur par le canvas
     pageContainer.innerHTML = '';
     pageContainer.appendChild(canvas);
     pageContainer.style.minHeight = 'auto';
@@ -180,12 +186,7 @@
   try {
     pdfDoc = await pdfjsLib.getDocument(url).promise;
 
-    // Calculer le scale pour remplir la largeur de l'écran
-    const firstPage = await pdfDoc.getPage(1);
-    const viewport = firstPage.getViewport({ scale: 1 });
-    scale = window.innerWidth / viewport.width;
-
-    // Créer les conteneurs pour toutes les pages (vides au départ)
+    /* Create containers for all pages */
     for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
       const pageContainer = document.createElement('div');
       pageContainer.className = 'page-container';
@@ -195,30 +196,27 @@
       pageElements.push(pageContainer);
     }
 
-    // Rendre seulement les 3 premières pages au départ
+    /* Render first three pages */
     await renderPage(1);
     await renderPage(2);
     await renderPage(3);
 
-    // Animation de fade out
     loadingDiv.classList.add('fade-out');
     
-    // Supprimer l'élément après l'animation
     setTimeout(() => {
       loadingDiv.style.display = 'none';
     }, 800);
 
-    // Rendre les autres pages en arrière-plan
+    /* Render remaining pages in background */
     for (let i = 4; i <= pdfDoc.numPages; i++) {
       await renderPage(i);
     }
 
   } catch (error) {
-    loadingDiv.innerHTML = 'Erreur lors du chargement du PDF : ' + error.message;
-    console.error('Erreur:', error);
+    loadingDiv.innerHTML = 'Error loading PDF: ' + error.message;
+    console.error('Error:', error);
   }
 
-  // Fonction pour aller à une page spécifique
   function goToPage(pageNum) {
     if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
     
@@ -227,11 +225,11 @@
     pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Navigation au clavier
+  /* Keyboard navigation */
   document.addEventListener('keydown', (e) => {
     switch(e.key) {
       case 'ArrowDown':
-      case ' ':  // Espace
+      case ' ':
       case 'PageDown':
         e.preventDefault();
         goToPage(currentPage + 1);
@@ -252,7 +250,7 @@
     }
   });
 
-  // Détecter quelle page est visible lors du scroll
+  /* Detect currently visible page during scroll */
   let scrollTimeout;
   viewerContainer.addEventListener('scroll', () => {
     clearTimeout(scrollTimeout);
@@ -268,6 +266,23 @@
         }
       }
     }, 100);
+  });
+
+  /* Handle window resize to maintain optimal rendering quality */
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      renderedPages.clear();
+      for (let i = 1; i <= Math.min(3, pdfDoc.numPages); i++) {
+        renderPage(i);
+      }
+      setTimeout(() => {
+        for (let i = 4; i <= pdfDoc.numPages; i++) {
+          renderPage(i);
+        }
+      }, 500);
+    }, 300);
   });
 </script>
 
