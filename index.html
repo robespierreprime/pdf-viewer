@@ -273,9 +273,24 @@
   /* Handle window resize to maintain optimal rendering quality */
   window.addEventListener('resize', () => {
     renderedPages.clear();
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      renderPage(i);
+    
+    const pagesToRender = [
+      Math.max(1, currentPage - 1),
+      currentPage,
+      Math.min(pdfDoc.numPages, currentPage + 1)
+    ];
+    
+    for (const pageNum of pagesToRender) {
+      renderPage(pageNum);
     }
+    
+    setTimeout(() => {
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        if (!pagesToRender.includes(i)) {
+          renderPage(i);
+        }
+      }
+    }, 100);
   });
 </script>
 
