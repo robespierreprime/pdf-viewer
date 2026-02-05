@@ -4,8 +4,11 @@
   <meta charset="utf-8">
   <title>PDF Viewer</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400&display=swap');
-    
+    @font-face {
+    font-family: "self-modern_regular";
+    src: url("/self-modern_regular.ttf");
+}
+
     html, body {
       margin: 0;
       padding: 0;
@@ -60,7 +63,7 @@
       transform: translate(-50%, -50%);
       color: #666;
       font-size: 18px;
-      font-family: 'Libre Baskerville', 'Georgia', serif;
+      font-family: 'self-modern_regular';
       font-weight: 400;
       letter-spacing: 0.5px;
       background: rgba(255, 255, 255, 0.95);
@@ -110,7 +113,7 @@
         transform: translateY(0);
       }
       25% {
-        transform: translateY(-12px);
+        transform: translateY(-9px);
       }
       50% {
         transform: translateY(0);
@@ -120,7 +123,7 @@
 </head>
 <body>
   <div id="loading">
-    <span>Chargement du PDF</span>
+    <span>chargement du pdf</span>
     <div class="dots">
       <div class="dot"></div>
       <div class="dot"></div>
