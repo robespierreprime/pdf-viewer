@@ -271,20 +271,11 @@
   });
 
   /* Handle window resize to maintain optimal rendering quality */
-  let resizeTimeout;
   window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      renderedPages.clear();
-      for (let i = 1; i <= Math.min(3, pdfDoc.numPages); i++) {
-        renderPage(i);
-      }
-      setTimeout(() => {
-        for (let i = 4; i <= pdfDoc.numPages; i++) {
-          renderPage(i);
-        }
-      }, 10);
-    }, 5);
+    renderedPages.clear();
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      renderPage(i);
+    }
   });
 </script>
 
