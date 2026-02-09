@@ -20,9 +20,7 @@
     
     #viewer-container {
       width: 100vw;
-      height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
+      height: 100dvh; /* Dynamic viewport height - s'adapte aux barres Safari */
       overflow-y: scroll;
       overflow-x: hidden;
       scroll-behavior: smooth;
