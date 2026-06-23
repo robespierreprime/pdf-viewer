@@ -86,6 +86,25 @@
       height: 100%;
       font-size: 1em;
     }
+
+    /* Liens auto-détectés depuis le texte (le PDF n'a pas de vraies annotations de lien) */
+    .linkLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .linkLayer a {
+      position: absolute;
+      display: block;
+      pointer-events: auto;
+      cursor: pointer;
+      background: transparent;
+    }
     
     #loading {
       position: fixed;
@@ -225,6 +244,50 @@
     isPageCached() { return true; },
   };
 
+  /* Détection d'URLs/emails dans un fragment de texte */
+  const URL_RE = /^(https?:\/\/\S+|www\.\S+|[^\s@]+@[^\s@]+\.[^\s@]+|[a-z0-9-]+\.(?:com|fr|net|org|io|co|be|ch|eu)(?:\/\S*)?)$/i;
+
+  function toHref(raw) {
+    const s = raw.replace(/[).,;:]+$/, '');
+    if (/^https?:\/\//i.test(s)) return s;
+    if (/^[^\s@]+@[^\s@]+$/.test(s)) return 'mailto:' + s;
+    return 'https://' + s;
+  }
+
+  /* Pose des liens cliquables transparents sur les URLs trouvées dans le texte de la page */
+  async function buildTextLinks(page, cssViewport, scale, wrapper) {
+    const textContent = await page.getTextContent();
+    let layer = null;
+
+    for (const item of textContent.items) {
+      const text = (item.str || '').trim();
+      if (!text || !URL_RE.test(text)) continue;
+
+      const tx = pdfjsLib.Util.transform(cssViewport.transform, item.transform);
+      const fontHeight = Math.hypot(tx[2], tx[3]);
+      const widthPx = item.width * scale;
+      const left = tx[4];
+      const top = tx[5] - fontHeight;
+
+      if (!layer) {
+        layer = document.createElement('div');
+        layer.className = 'linkLayer';
+        wrapper.appendChild(layer);
+      }
+
+      const a = document.createElement('a');
+      a.href = toHref(text);
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer nofollow';
+      a.title = text;
+      a.style.left = `${left}px`;
+      a.style.top = `${top - fontHeight * 0.2}px`;
+      a.style.width = `${widthPx}px`;
+      a.style.height = `${fontHeight * 1.4}px`;
+      layer.appendChild(a);
+    }
+  }
+
   async function renderPage(pageNumber) {
     if (renderedPages.has(pageNumber)) return;
     renderedPages.add(pageNumber); /* réserve tôt pour éviter un double rendu */
@@ -253,10 +316,11 @@
 
       await page.render({ canvasContext: context, viewport: scaledViewport }).promise;
 
-      /* Couche de liens superposée au canvas */
+      const cssViewport = page.getViewport({ scale });
+
+      /* 1) Vraies annotations de lien du PDF (si présentes) */
       const annotations = await page.getAnnotations({ intent: 'display' });
       if (annotations.length) {
-        const cssViewport = page.getViewport({ scale });
         const annotationDiv = document.createElement('div');
         annotationDiv.className = 'annotationLayer';
         annotationDiv.style.setProperty('--total-scale-factor', scale);
@@ -269,6 +333,9 @@
           annotations, viewport: cssViewport, linkService, renderForms: false,
         });
       }
+
+      /* 2) Liens auto-détectés depuis le texte (ce PDF n'a pas d'annotations) */
+      await buildTextLinks(page, cssViewport, scale, wrapper);
 
       const pageContainer = pageElements[pageNumber - 1];
       pageContainer.replaceChildren(wrapper);
