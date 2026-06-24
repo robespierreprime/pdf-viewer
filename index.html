@@ -293,11 +293,18 @@
     try {
       const page = await pdfDoc.getPage(pageNumber);
 
+      const QUALITY = 2;          /* sur-échantillonnage : marge de netteté au zoom */
+      const MAX_CANVAS_PX = 4096; /* plafond par dimension (limites mémoire/canvas mobiles) */
+
       const containerWidth = viewerContainer.clientWidth;
       const baseViewport = page.getViewport({ scale: 1 });
-      const scale = containerWidth / baseViewport.width;
-      const scaledViewport = page.getViewport({ scale: scale * pixelRatio });
-      const cssHeight = scaledViewport.height / pixelRatio;
+      const scale = containerWidth / baseViewport.width; /* échelle d'affichage CSS */
+
+      /* échelle de rastérisation, plafonnée pour ne pas dépasser 4096 px par côté */
+      const maxScale = MAX_CANVAS_PX / Math.max(baseViewport.width, baseViewport.height);
+      const renderScale = Math.min(scale * pixelRatio * QUALITY, maxScale);
+      const renderViewport = page.getViewport({ scale: renderScale });
+      const cssHeight = baseViewport.height * scale;
 
       const wrapper = document.createElement('div');
       wrapper.className = 'page-wrapper';
@@ -306,13 +313,13 @@
 
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
-      canvas.width = scaledViewport.width;
-      canvas.height = scaledViewport.height;
+      canvas.width = renderViewport.width;
+      canvas.height = renderViewport.height;
       canvas.style.width = `${containerWidth}px`;
       canvas.style.height = `${cssHeight}px`;
       wrapper.appendChild(canvas);
 
-      await page.render({ canvasContext: context, viewport: scaledViewport }).promise;
+      await page.render({ canvasContext: context, viewport: renderViewport }).promise;
 
       const cssViewport = page.getViewport({ scale });
 
