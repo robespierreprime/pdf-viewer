@@ -186,24 +186,14 @@
   <!-- Filet de sécurité : script CLASSIQUE (volontairement en JS ancien, sans
        arrow/const/template) pour s'exécuter même si le module ES échoue sur un
        navigateur trop vieux. Si le PDF n'est pas chargé après le délai, on
-       propose le lien direct. -->
+       ouvre directement le PDF dans le navigateur. -->
   <script>
     (function () {
-      var TIMEOUT_MS = 15000;
+      var TIMEOUT_MS = 10000;
       window.__pdfLoaded = false;
       window.__pdfFallbackTimer = setTimeout(function () {
         if (window.__pdfLoaded) return;
-        var el = document.getElementById('loading');
-        if (!el) return;
-        el.classList.remove('fade-out');
-        el.style.opacity = '1';
-        el.innerHTML =
-          '<div style="text-align:center;line-height:1.6">' +
-          'Le visualiseur n\'a pas pu démarrer.<br>' +
-          'Votre navigateur est peut-être trop ancien.<br><br>' +
-          '<a href="src.pdf" target="_blank" rel="noopener" ' +
-          'style="color:#333;text-decoration:underline">Ouvrir le PDF directement</a>' +
-          '</div>';
+        window.location.href = 'src.pdf';
       }, TIMEOUT_MS);
     })();
   </script>
@@ -421,17 +411,11 @@
     setTimeout(() => { loadingDiv.style.display = 'none'; }, 800);
 
   } catch (error) {
-    /* erreur explicite : on désamorce le filet et on propose aussi le lien direct */
+    /* erreur explicite : on désamorce le filet et on ouvre directement le PDF */
     window.__pdfLoaded = true;
     clearTimeout(window.__pdfFallbackTimer);
-    loadingDiv.classList.remove('fade-out');
-    loadingDiv.innerHTML =
-      '<div style="text-align:center;line-height:1.6">' +
-      'Erreur de chargement du PDF.<br><br>' +
-      '<a href="src.pdf" target="_blank" rel="noopener" ' +
-      'style="color:#333;text-decoration:underline">Ouvrir le PDF directement</a>' +
-      '</div>';
     console.error('Error:', error);
+    window.location.href = 'src.pdf';
   }
 
   /* Keyboard navigation */
